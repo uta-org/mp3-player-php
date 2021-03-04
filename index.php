@@ -44,6 +44,43 @@
                 opacity: .5;
             }
 
+            .mp3-controls {
+                position: fixed;
+                bottom: 70px;
+                left: 10px;
+            }
+            
+            @media (max-width: 600px) {
+               .mp3-controls {
+                    position: fixed;
+                    top: 0px;
+                    left: 0px;
+                    background-color: white;
+                    width: 100%;
+                    height: 64px;
+                }
+                
+                .mp3-controls input {
+                    background-color: transparent!important;
+                    border-color: transparent!important;
+                    outline: transparent!important;
+                    color: black;
+                    font-weight: bold;
+                    font-size: 300%;
+                }
+                
+                body {
+                    margin-top: 80px;
+                }
+            }
+            
+            #rnd[is_random='si'] {
+                color: red;
+            }
+            
+            #rnd[is_random='no'] {
+                color: black;
+            }
         </style>
     </head>
     <body>
@@ -56,66 +93,124 @@
                 <source id="audio-source">
                 Browser anda tidak mendukung, silakan gunakan browser versi jaman now
             </audio>
+            <div class="mp3-controls">
+                <input id="rewindbutton" type=button onclick="backward()" value="&lt;&lt;">
+                <input id="rewindbutton" type=button onclick="previous()" value="&lt;">
+                <input id="forwardbutton" type=button onclick="next()" value="&gt;">
+                <input id="forwardbutton" type=button onclick="forward()" value="&gt;&gt;">
+                <input id="rnd" type="button" value="R" onclick="shuffle(this)">
+            </div>
         </div>
 
 
         <?php
         // ref: http://www.zedwood.com/article/php-calculate-duration-of-mp3
-        //require_once "mp3file.class.php";
+        // require_once "mp3file.class.php";
+        error_reporting(-1);
 
         $dir = "playlists/";
         if (is_dir($dir)) {
-            if ($buka = opendir($dir)) {
-                echo '<ul id="playlist">';
-                while (($file = readdir($buka)) !== false) {
-                    //$mp3file = new MP3File('./'.$dir.$file);
-                    //$duration = $mp3file->getDuration(); //(slower) for VBR (or CBR)
-                    if (strpos($file, '.mp3')) {
-                        //echo '<li><small class="duration">' . MP3File::formatTime($duration) . '</small><a href="javascript:void(0)">' . $file . '</a></li>';
-                        echo '<li><a href="javascript:void(0)">' . $file . '</a></li>';
+            // if ($buka = opendir($dir)) {
+                echo '<ul id="playlist" dir="'.$dir.'">';
+                $dirs = scandir($dir);
+            
+                // echo print_r($dirs, true);
+                // while (($file = readdir($dir)) !== false) {
+                foreach($dirs as $file) {
+                    if(substr($file, 0, 1) == '.') continue;
+                    $mp3_folder = $dir.$file;
+                    
+                    // echo "Dir: ".$file;
+                    // echo print_r($dirs, true);
+                    
+                    if(is_dir($mp3_folder)) {
+                        $mp3_dir = scandir($mp3_folder);
+                        $cur_dir = str_replace($dir, '', $mp3_folder);
+                        
+                        /*
+                        echo "<pre><code>";
+                        echo "File: ".$file.PHP_EOL;
+                        echo print_r($mp3_dir, true);
+                        echo "</code></pre>";
+                        */
+                        
+                        foreach($mp3_dir as $mp3file) {
+                            if (strpos($mp3file, '.mp3')) {
+                                // echo $mp3file;
+                                $f = $cur_dir.'/'.$mp3file;
+                                //echo '<li><small class="duration">' . MP3File::formatTime($duration) . '</small><a href="javascript:void(0)">' . $file . '</a></li>';
+                                echo '<li><a href="javascript:void(0)">' . $f . '</a></li>';
+                            }
+                        }
+                    } else {
+                        //$mp3file = new MP3File('./'.$dir.$file);
+                        //$duration = $mp3file->getDuration(); //(slower) for VBR (or CBR)
+                        if (strpos($file, '.mp3')) {
+                            $f = str_replace($dir, '', $file);
+                            //echo '<li><small class="duration">' . MP3File::formatTime($duration) . '</small><a href="javascript:void(0)">' . $file . '</a></li>';
+                            echo '<li><a href="javascript:void(0)">' . $f . '</a></li>';
+                        }
                     }
                 }
                 echo '</ul>';
-                closedir($buka);
-            }
-        }
+                // closedir($buka);
+            // } else die("Error");
+        } else die("Error");
         ?>
 
 
         <script src="jquery-3.3.1.min.js"></script>
         <script>
-            $(document).ready(function () {
-                $('#playlist').css('margin-bottom', eval($('#container-player').height() - 15) + "px");
-                $('#visualizer').css('bottom', eval($('#container-player').height() - 15) + "px");
+            var current_index = 0, max, folder, urutan, file, mainkan, context;
+            
+            function shuffle(el) {
+                document.getElementById('inputRandom').checked = !$('#inputRandom').prop('checked');
+                el.setAttribute('is_random', $('#inputRandom').prop('checked') ? 'si' : 'no');
+            }   
+            
+            function next() {
+                    var is_random = $('#inputRandom').prop('checked');
+                    var index = is_random ? getRandomInt(0, max) : current_index + 1 >= max ? 0 : current_index + 1;
+                    playAudio(index);
+                }
+                
+                function previous() {
+                    var is_random = $('#inputRandom').prop('checked');
+                    var index = is_random ? getRandomInt(0, max) : current_index - 1 < 0 ? max - 1 : current_index - 1;
+                    playAudio(index);
+                }
+                
+                function backward() {
+                    var audio = $('#audio-source');
+                    audio.currentTime -= 5;
+                  }
 
-                var folder = "<?= $dir ?>";
-                var urutan = 0;
-                var max = $('#playlist a').length;
-                var file, mainkan = "";
+                  function forward() {
+                    var audio = $('#audio-source');
+                    audio.currentTime += 5;
+                  }
+            
+                            function playAudio(urutan) {
+                    current_index = urutan;
+                    
+                    tandaiTerpilih(urutan);
+                    file = $('#playlist a:eq(' + urutan + ')').text();
+                    mainkan = folder + file;
+                    $('#sedang-main').html(file);
+                    $('#audio-source').prop('src', mainkan);
+                    $('#audio-player').trigger('load');
+                    $('#audio-player').trigger('play');
 
-                $('#playlist a').on('click', function () {
-                    urutan = $(this).parent().prevAll().length;
-                    playAudio(urutan);
-                });
-
-                $('#audio-player').on('ended', function () {
-                    var isRandom = $('#inputRandom').prop('checked');
-                    if (isRandom) {
-                        urutan = getRandomInt(0, max);
-                    } else {
-                        urutan++;
-                        if (urutan == $('#playlist a').length) {
-                            urutan = 0;
-                        }
-                    }
-                    playAudio(urutan);
-                });
-
+                    makeVisualizer();
+                }
+                
                 function makeVisualizer() {
+                    if(context != null) return;
+                    
                     var audio = document.getElementById("audio-player");
 //                var audio = document.createElement(audio);
                     //ref: https://codepen.io/nfj525/pen/rVBaab
-                    var context = new AudioContext();
+                    context = new AudioContext();
                     var src = context.createMediaElementSource(audio);
                     var analyser = context.createAnalyser();
 
@@ -166,31 +261,11 @@
                     }
                     renderFrame();
                 }
-
-                $("#cariLagu").on("keyup", function () {
-                    var value = $(this).val().toLowerCase();
-                    $("#playlist li").filter(function () {
-                        $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-                    });
-                });
-
-
-                function getRandomInt(min, max) {
+            
+                            function getRandomInt(min, max) {
                     min = Math.ceil(min);
                     max = Math.floor(max);
                     return Math.floor(Math.random() * (max - min + 1)) + min;
-                }
-
-                function playAudio(urutan) {
-                    tandaiTerpilih(urutan);
-                    file = $('#playlist a:eq(' + urutan + ')').text();
-                    mainkan = folder + file;
-                    $('#sedang-main').html(file);
-                    $('#audio-source').prop('src', mainkan);
-                    $('#audio-player').trigger('load');
-                    $('#audio-player').trigger('play');
-
-                    makeVisualizer();
                 }
 
                 function tandaiTerpilih(urutan) {
@@ -199,6 +274,46 @@
                         return index === urutan;
                     }).css('background-color', '#037');
                 }
+            
+            $(document).ready(function () {
+                $('#playlist').css('margin-bottom', eval($('#container-player').height() - 15) + "px");
+                $('#visualizer').css('bottom', eval($('#container-player').height() - 15) + "px");
+
+                folder = "<?= $dir ?>";
+                urutan = 0;
+                max = $('#playlist a').length;
+                file = '', mainkan = "";
+
+                $('#playlist a').on('click', function () {
+                    urutan = $(this).parent().prevAll().length;
+                    playAudio(urutan);
+                });
+
+                $('#audio-player').on('ended', function () {
+                    var isRandom = $('#inputRandom').prop('checked');
+                    if (isRandom) {
+                        urutan = getRandomInt(0, max);
+                    } else {
+                        urutan++;
+                        if (urutan == $('#playlist a').length) {
+                            urutan = 0;
+                        }
+                    }
+                    playAudio(urutan);
+                });
+
+                
+                $("#cariLagu").on("keyup", function () {
+                    var value = $(this).val().toLowerCase();
+                    $("#playlist li").filter(function () {
+                        $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                    });
+                });
+
+
+
+
+
 
             });
         </script>
